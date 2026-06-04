@@ -60,6 +60,13 @@ jobs:
         if: matrix.os == 'macos-latest'
         shell: bash
         run: |
+          set -e
+          
+          if [ ! -f "icons/icon.png" ]; then
+            echo "Error: icons/icon.png not found"
+            exit 1
+          fi
+          
           mkdir -p icons.iconset
 
           sips -z 16 16   icons/icon.png --out icons.iconset/icon_16x16.png
@@ -74,6 +81,11 @@ jobs:
           sips -z 1024 1024 icons/icon.png --out icons.iconset/icon_512x512@2x.png
 
           iconutil -c icns icons.iconset -o icons/icon.icns
+          
+          if [ ! -f "icons/icon.icns" ]; then
+            echo "Error: Failed to create icons/icon.icns"
+            exit 1
+          fi
 
       # -----------------------------
       # Set icon per OS
