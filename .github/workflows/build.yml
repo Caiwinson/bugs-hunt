@@ -1,0 +1,63 @@
+# .github/workflows/build.yml
+name: Build & Release
+
+on:
+    push:
+        tags:
+            - "v*" # triggers on tags like v1.0, v1.2.3
+
+jobs:
+    build:
+        strategy:
+            matrix:
+                include:
+                    - os: windows-latest
+                      artifact_name: MyApp-windows.exe
+                    - os: ubuntu-latest
+                      artifact_name: MyApp-linux
+                    - os: macos-latest
+                      artifact_name: MyApp-macos
+
+        runs-on: ${{ matrix.os }}
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+
+            - name: Build executable
+              uses: sayyid5416/pyinstaller@v1
+              with:
+                  python_ver: "3.11"
+                  spec: "main.py"
+                  requirements: "requirements.txt"
+                  options: >-
+                      --onefile, --noconsole,
+                      --add-data "bugs:bugs",
+                      --add-data "audio:audio",
+                      --add-data "assets:assets",
+                      --add-data "oi-oi-oi/spritesheet.png:oi-oi-oi",
+                      --add-data "background.png:.",
+
+            - name: Rename executable
+              shell: bash
+              run: |
+                  # Windows builds as main.exe, others as main
+                  if [ -f dist/main.exe ]; then
+                    mv dist/main.exe dist/${{ matrix.artifact_name }}
+                  else
+                    mv dist/main dist/${{ matrix.artifact_name }}
+                  fi
+
+            - name: Upload to Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  files: dist/${{ matrix.artifact_name }}
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    create-release:
+        needs: build
+        runs-on: ubuntu-latest
+        steps:
+            - name: Mark release as non-draft
+              run: echo "All builds done!"
