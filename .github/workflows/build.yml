@@ -1,154 +1,71 @@
+# .github/workflows/build.yml
 name: Build & Release
 
 on:
-  push:
-    tags:
-      - "v*"
+    push:
+        tags:
+            - "v*"
 
 permissions:
-  contents: write
+  contents: write  
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            platform: windows
-            ext: .exe
-          - os: ubuntu-latest
-            platform: linux
-            ext: ""
-          - os: macos-latest
-            platform: macos
-            ext: ""
+    build:
+        strategy:
+            matrix:
+                include:
+                    - os: windows-latest
+                      platform: windows
+                      ext: .exe
+                    - os: ubuntu-latest
+                      platform: linux
+                      ext: ""
+                    - os: macos-latest
+                      platform: macos
+                      ext: ""
 
-    runs-on: ${{ matrix.os }}
+        runs-on: ${{ matrix.os }}
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
 
-      # -----------------------------
-      # Windows only dependency
-      # -----------------------------
-      - name: Install Pillow (Windows only)
-        if: matrix.os == 'windows-latest'
-        run: pip install pillow
+            - name: Build executable
+              uses: sayyid5416/pyinstaller@v1
+              with:
+                  python_ver: "3.12"
+                  spec: "main.py"
+                  requirements: "requirements.txt"
+                  options: >-
+                      --onefile, --noconsole,
+                      --add-data "bugs:bugs",
+                      --add-data "audio:audio",
+                      --add-data "assets:assets",
+                      --add-data "oi-oi-oi/spritesheet.png:oi-oi-oi",
+                      --add-data "background.png:.",
 
-      # -----------------------------
-      # Windows ICO generation
-      # -----------------------------
-      - name: Generate Windows icon (.ico)
-        if: matrix.os == 'windows-latest'
-        shell: python
-        run: |
-          from PIL import Image
+            - name: Rename executable
+              shell: bash
+              run: |
+                  VERSION=${GITHUB_REF_NAME}
+                  ARTIFACT_NAME="bugs-hunt-${VERSION}-${{ matrix.platform }}${{ matrix.ext }}"
+                  if [ -f dist/main.exe ]; then
+                    mv dist/main.exe "dist/${ARTIFACT_NAME}"
+                  else
+                    mv dist/main "dist/${ARTIFACT_NAME}"
+                  fi
+                  echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> $GITHUB_ENV
 
-          img = Image.open("icons/icon.png")
+            - name: Upload to Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  files: dist/${{ env.ARTIFACT_NAME }}
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-          img.save(
-              "icons/icon.ico",
-              format="ICO",
-              sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)]
-          )
-
-      # -----------------------------
-      # macOS ICNS (native tools)
-      # -----------------------------
-      - name: Generate macOS icon (.icns)
-        if: matrix.os == 'macos-latest'
-        shell: bash
-        run: |
-          set -e
-          
-          if [ ! -f "icons/icon.png" ]; then
-            echo "Error: icons/icon.png not found"
-            exit 1
-          fi
-          
-          mkdir -p icons.iconset
-
-          sips -z 16 16   icons/icon.png --out icons.iconset/icon_16x16.png
-          sips -z 32 32   icons/icon.png --out icons.iconset/icon_16x16@2x.png
-          sips -z 32 32   icons/icon.png --out icons.iconset/icon_32x32.png
-          sips -z 64 64   icons/icon.png --out icons.iconset/icon_32x32@2x.png
-          sips -z 128 128 icons/icon.png --out icons.iconset/icon_128x128.png
-          sips -z 256 256 icons/icon.png --out icons.iconset/icon_128x128@2x.png
-          sips -z 256 256 icons/icon.png --out icons.iconset/icon_256x256.png
-          sips -z 512 512 icons/icon.png --out icons.iconset/icon_256x256@2x.png
-          sips -z 512 512 icons/icon.png --out icons.iconset/icon_512x512.png
-          sips -z 1024 1024 icons/icon.png --out icons.iconset/icon_512x512@2x.png
-
-          iconutil -c icns icons.iconset -o icons/icon.icns
-          
-          if [ ! -f "icons/icon.icns" ]; then
-            echo "Error: Failed to create icons/icon.icns"
-            exit 1
-          fi
-
-      # -----------------------------
-      # Set icon per OS
-      # -----------------------------
-      - name: Set icon path
-        shell: bash
-        run: |
-          if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            echo "ICON_PATH=icons/icon.icns" >> $GITHUB_ENV
-          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
-            echo "ICON_PATH=icons/icon.ico" >> $GITHUB_ENV
-          else
-            echo "ICON_PATH=icons/icon.png" >> $GITHUB_ENV
-          fi
-
-      # -----------------------------
-      # Build executable
-      # -----------------------------
-      - name: Build executable
-        uses: sayyid5416/pyinstaller@v1
-        with:
-          python_ver: "3.12"
-          spec: "main.py"
-          requirements: "requirements.txt"
-          options: >-
-            --onefile --noconsole
-            --icon=${{ env.ICON_PATH }}
-            --add-data "bugs:bugs"
-            --add-data "audio:audio"
-            --add-data "assets:assets"
-            --add-data "oi-oi-oi/spritesheet.png:oi-oi-oi"
-            --add-data "background.png:."
-
-      # -----------------------------
-      # Rename artifact
-      # -----------------------------
-      - name: Rename executable
-        shell: bash
-        run: |
-          VERSION=${GITHUB_REF_NAME}
-          ARTIFACT_NAME="bugs-hunt-${VERSION}-${{ matrix.platform }}${{ matrix.ext }}"
-
-          if [ -f dist/main.exe ]; then
-            mv dist/main.exe "dist/${ARTIFACT_NAME}"
-          else
-            mv dist/main "dist/${ARTIFACT_NAME}"
-          fi
-
-          echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> $GITHUB_ENV
-
-      # -----------------------------
-      # Upload release
-      # -----------------------------
-      - name: Upload to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/${{ env.ARTIFACT_NAME }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  create-release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Done
-        run: echo "Build completed"
+    create-release:
+        needs: build
+        runs-on: ubuntu-latest
+        steps:
+            - name: Mark release as non-draft
+              run: echo "All builds done!"
