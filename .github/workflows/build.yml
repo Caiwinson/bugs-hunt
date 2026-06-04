@@ -4,10 +4,10 @@ name: Build & Release
 on:
     push:
         tags:
-            - "v*" # triggers on tags like v1.0, v1.2.3
+            - "v*"
 
 permissions:
-  contents: write  
+    contents: write
 
 jobs:
     build:
@@ -15,11 +15,14 @@ jobs:
             matrix:
                 include:
                     - os: windows-latest
-                      artifact_name: MyApp-windows.exe
+                      platform: windows
+                      ext: .exe
                     - os: ubuntu-latest
-                      artifact_name: MyApp-linux
+                      platform: linux
+                      ext: ""
                     - os: macos-latest
-                      artifact_name: MyApp-macos
+                      platform: macos
+                      ext: ""
 
         runs-on: ${{ matrix.os }}
 
@@ -35,6 +38,7 @@ jobs:
                   requirements: "requirements.txt"
                   options: >-
                       --onefile, --noconsole,
+                      --icon "icon.ico",
                       --add-data "bugs:bugs",
                       --add-data "audio:audio",
                       --add-data "assets:assets",
@@ -44,17 +48,19 @@ jobs:
             - name: Rename executable
               shell: bash
               run: |
-                  # Windows builds as main.exe, others as main
+                  VERSION=${GITHUB_REF_NAME}
+                  ARTIFACT_NAME="bugs-hunt-${VERSION}-${{ matrix.platform }}${{ matrix.ext }}"
                   if [ -f dist/main.exe ]; then
-                    mv dist/main.exe dist/${{ matrix.artifact_name }}
+                    mv dist/main.exe "dist/${ARTIFACT_NAME}"
                   else
-                    mv dist/main dist/${{ matrix.artifact_name }}
+                    mv dist/main "dist/${ARTIFACT_NAME}"
                   fi
+                  echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> $GITHUB_ENV
 
             - name: Upload to Release
               uses: softprops/action-gh-release@v2
               with:
-                  files: dist/${{ matrix.artifact_name }}
+                  files: dist/${{ env.ARTIFACT_NAME }}
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

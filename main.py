@@ -262,7 +262,7 @@ font = pygame.font.Font(None, 36)  # You can specify the font file and size
 
 # Set up the display, borderless window
 screen = pygame.display.set_mode((800, 600))
-pygame.display.set_caption("Bug Game")
+pygame.display.set_caption("Bugs Hunt")
 pygame.mouse.set_visible(False)
 
 preload()
