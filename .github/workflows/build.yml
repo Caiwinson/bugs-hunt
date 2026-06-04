@@ -7,7 +7,7 @@ on:
             - "v*"
 
 permissions:
-    contents: write
+  contents: write  
 
 jobs:
     build:
@@ -30,6 +30,30 @@ jobs:
             - name: Checkout code
               uses: actions/checkout@v3
 
+            - name: Convert icon for macOS
+              if: matrix.os == 'macos-latest'
+              run: |
+                  mkdir -p icon.iconset
+                  sips -z 16 16     icon.ico --out icon.iconset/icon_16x16.png
+                  sips -z 32 32     icon.ico --out icon.iconset/icon_16x16@2x.png
+                  sips -z 32 32     icon.ico --out icon.iconset/icon_32x32.png
+                  sips -z 64 64     icon.ico --out icon.iconset/icon_32x32@2x.png
+                  sips -z 128 128   icon.ico --out icon.iconset/icon_128x128.png
+                  sips -z 256 256   icon.ico --out icon.iconset/icon_128x128@2x.png
+                  sips -z 256 256   icon.ico --out icon.iconset/icon_256x256.png
+                  sips -z 512 512   icon.ico --out icon.iconset/icon_256x256@2x.png
+                  sips -z 512 512   icon.ico --out icon.iconset/icon_512x512.png
+                  iconutil -c icns icon.iconset -o icon.icns
+
+            - name: Set icon path
+              shell: bash
+              run: |
+                  if [ "${{ matrix.os }}" = "macos-latest" ]; then
+                    echo "ICON_PATH=icon.icns" >> $GITHUB_ENV
+                  else
+                    echo "ICON_PATH=icon.ico" >> $GITHUB_ENV
+                  fi
+
             - name: Build executable
               uses: sayyid5416/pyinstaller@v1
               with:
@@ -38,7 +62,7 @@ jobs:
                   requirements: "requirements.txt"
                   options: >-
                       --onefile, --noconsole,
-                      --icon "icon.ico",
+                      --icon "${{ env.ICON_PATH }}",
                       --add-data "bugs:bugs",
                       --add-data "audio:audio",
                       --add-data "assets:assets",
