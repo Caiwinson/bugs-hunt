@@ -16,17 +16,12 @@ jobs:
           - os: windows-latest
             platform: windows
             ext: .exe
-            icon: icon.ico
-
           - os: ubuntu-latest
             platform: linux
             ext: ""
-            icon: icon.png
-
           - os: macos-latest
             platform: macos
             ext: ""
-            icon: icon.icns
 
     runs-on: ${{ matrix.os }}
 
@@ -34,45 +29,67 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # ---------------------------
-      # macOS icon conversion ONLY
-      # ---------------------------
-      - name: Build macOS .icns icon
+      # -----------------------------
+      # Install ImageMagick (Linux)
+      # -----------------------------
+      - name: Install ImageMagick (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+
+      # -----------------------------
+      # Generate Windows/Linux icons
+      # -----------------------------
+      - name: Generate Windows/Linux icons
+        if: matrix.os != 'macos-latest'
+        shell: bash
+        run: |
+          mkdir -p icons
+
+          # Windows ICO (multi-resolution)
+          magick icons/icon.png -define icon:auto-resize=256,128,64,48,32,16 icons/icon.ico
+
+          # Linux PNG (keep simple, optionally resize)
+          magick icons/icon.png -resize 512x512 icons/icon.png
+
+      # -----------------------------
+      # Generate macOS ICNS
+      # -----------------------------
+      - name: Generate macOS icon (.icns)
         if: matrix.os == 'macos-latest'
         shell: bash
         run: |
-          mkdir -p icon.iconset
+          mkdir -p icons/icon.iconset
 
-          # Use PNG source (IMPORTANT: no .ico usage)
-          sips -z 16 16 icon.png --out icon.iconset/icon_16x16.png
-          sips -z 32 32 icon.png --out icon.iconset/icon_16x16@2x.png
-          sips -z 32 32 icon.png --out icon.iconset/icon_32x32.png
-          sips -z 64 64 icon.png --out icon.iconset/icon_32x32@2x.png
-          sips -z 128 128 icon.png --out icon.iconset/icon_128x128.png
-          sips -z 256 256 icon.png --out icon.iconset/icon_128x128@2x.png
-          sips -z 256 256 icon.png --out icon.iconset/icon_256x256.png
-          sips -z 512 512 icon.png --out icon.iconset/icon_256x256@2x.png
-          sips -z 512 512 icon.png --out icon.iconset/icon_512x512.png
+          magick icons/icon.png -resize 16x16   icons/icon.iconset/icon_16x16.png
+          magick icons/icon.png -resize 32x32   icons/icon.iconset/icon_16x16@2x.png
+          magick icons/icon.png -resize 32x32   icons/icon.iconset/icon_32x32.png
+          magick icons/icon.png -resize 64x64   icons/icon.iconset/icon_32x32@2x.png
+          magick icons/icon.png -resize 128x128 icons/icon.iconset/icon_128x128.png
+          magick icons/icon.png -resize 256x256 icons/icon.iconset/icon_128x128@2x.png
+          magick icons/icon.png -resize 256x256 icons/icon.iconset/icon_256x256.png
+          magick icons/icon.png -resize 512x512 icons/icon.iconset/icon_256x256@2x.png
+          magick icons/icon.png -resize 512x512 icons/icon.iconset/icon_512x512.png
+          magick icons/icon.png -resize 1024x1024 icons/icon.iconset/icon_512x512@2x.png
 
-          iconutil -c icns icon.iconset -o icon.icns
+          iconutil -c icns icons/icon.iconset -o icons/icon.icns
 
-      # ---------------------------
-      # Set icon path per platform
-      # ---------------------------
+      # -----------------------------
+      # Select correct icon per OS
+      # -----------------------------
       - name: Set icon path
         shell: bash
         run: |
           if [ "${{ matrix.os }}" = "macos-latest" ]; then
-            echo "ICON_PATH=icon.icns" >> $GITHUB_ENV
+            echo "ICON_PATH=icons/icon.icns" >> $GITHUB_ENV
           elif [ "${{ matrix.os }}" = "windows-latest" ]; then
-            echo "ICON_PATH=icon.ico" >> $GITHUB_ENV
+            echo "ICON_PATH=icons/icon.ico" >> $GITHUB_ENV
           else
-            echo "ICON_PATH=icon.png" >> $GITHUB_ENV
+            echo "ICON_PATH=icons/icon.png" >> $GITHUB_ENV
           fi
 
-      # ---------------------------
+      # -----------------------------
       # Build with PyInstaller
-      # ---------------------------
+      # -----------------------------
       - name: Build executable
         uses: sayyid5416/pyinstaller@v1
         with:
@@ -80,18 +97,17 @@ jobs:
           spec: "main.py"
           requirements: "requirements.txt"
           options: >-
-            --onefile
-            --noconsole
-            --icon "${{ env.ICON_PATH }}"
+            --onefile --noconsole
+            --icon=${{ env.ICON_PATH }}
             --add-data "bugs:bugs"
             --add-data "audio:audio"
             --add-data "assets:assets"
             --add-data "oi-oi-oi/spritesheet.png:oi-oi-oi"
             --add-data "background.png:."
 
-      # ---------------------------
-      # Rename output artifact
-      # ---------------------------
+      # -----------------------------
+      # Rename artifacts
+      # -----------------------------
       - name: Rename executable
         shell: bash
         run: |
@@ -106,9 +122,9 @@ jobs:
 
           echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> $GITHUB_ENV
 
-      # ---------------------------
-      # Upload release asset
-      # ---------------------------
+      # -----------------------------
+      # Upload release
+      # -----------------------------
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -116,9 +132,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # -----------------------------
+  # Final confirmation job
+  # -----------------------------
   create-release:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Finalize release
-        run: echo "All builds completed successfully."
+      - name: Mark release as complete
+        run: echo "All builds completed successfully!"
