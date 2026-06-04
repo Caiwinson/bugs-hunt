@@ -27,7 +27,7 @@ jobs:
             - name: Build executable
               uses: sayyid5416/pyinstaller@v1
               with:
-                  python_ver: "3.12.13"
+                  python_ver: "3.12"
                   spec: "main.py"
                   requirements: "requirements.txt"
                   options: >-
