@@ -1,0 +1,9 @@
+/.python-version
+/.venv
+/Bugs Hunt.exe
+/bugs-raw
+/build
+/dist
+/main copy.py
+/main.spec
+/test.py

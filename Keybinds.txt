@@ -1,0 +1,11 @@
+G = Start the game
+Esc = Quit the game
+F = Flashbang
+P = Flashbang(no sound)
+H = Reset score
+M = Toggle display mode
+N = Set game timer to 00:00
+Left Click = Fire
+Right Click = Reload
+Scroll Up = Switch to pistol
+Scroll Down = Switch to shotgun
