@@ -6,6 +6,9 @@ on:
         tags:
             - "v*" # triggers on tags like v1.0, v1.2.3
 
+permissions:
+  contents: write  
+
 jobs:
     build:
         strategy:
