@@ -1,96 +1,124 @@
-# .github/workflows/build.yml
 name: Build & Release
 
 on:
-    push:
-        tags:
-            - "v*"
+  push:
+    tags:
+      - "v*"
 
 permissions:
-  contents: write  
+  contents: write
 
 jobs:
-    build:
-        strategy:
-            matrix:
-                include:
-                    - os: windows-latest
-                      platform: windows
-                      ext: .exe
-                    - os: ubuntu-latest
-                      platform: linux
-                      ext: ""
-                    - os: macos-latest
-                      platform: macos
-                      ext: ""
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            ext: .exe
+            icon: icon.ico
 
-        runs-on: ${{ matrix.os }}
+          - os: ubuntu-latest
+            platform: linux
+            ext: ""
+            icon: icon.png
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v3
+          - os: macos-latest
+            platform: macos
+            ext: ""
+            icon: icon.icns
 
-            - name: Convert icon for macOS
-              if: matrix.os == 'macos-latest'
-              run: |
-                  mkdir -p icon.iconset
-                  sips -z 16 16     icon.ico --out icon.iconset/icon_16x16.png
-                  sips -z 32 32     icon.ico --out icon.iconset/icon_16x16@2x.png
-                  sips -z 32 32     icon.ico --out icon.iconset/icon_32x32.png
-                  sips -z 64 64     icon.ico --out icon.iconset/icon_32x32@2x.png
-                  sips -z 128 128   icon.ico --out icon.iconset/icon_128x128.png
-                  sips -z 256 256   icon.ico --out icon.iconset/icon_128x128@2x.png
-                  sips -z 256 256   icon.ico --out icon.iconset/icon_256x256.png
-                  sips -z 512 512   icon.ico --out icon.iconset/icon_256x256@2x.png
-                  sips -z 512 512   icon.ico --out icon.iconset/icon_512x512.png
-                  iconutil -c icns icon.iconset -o icon.icns
+    runs-on: ${{ matrix.os }}
 
-            - name: Set icon path
-              shell: bash
-              run: |
-                  if [ "${{ matrix.os }}" = "macos-latest" ]; then
-                    echo "ICON_PATH=icon.icns" >> $GITHUB_ENV
-                  else
-                    echo "ICON_PATH=icon.ico" >> $GITHUB_ENV
-                  fi
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-            - name: Build executable
-              uses: sayyid5416/pyinstaller@v1
-              with:
-                  python_ver: "3.12"
-                  spec: "main.py"
-                  requirements: "requirements.txt"
-                  options: >-
-                      --onefile, --noconsole,
-                      --icon "${{ env.ICON_PATH }}",
-                      --add-data "bugs:bugs",
-                      --add-data "audio:audio",
-                      --add-data "assets:assets",
-                      --add-data "oi-oi-oi/spritesheet.png:oi-oi-oi",
-                      --add-data "background.png:.",
+      # ---------------------------
+      # macOS icon conversion ONLY
+      # ---------------------------
+      - name: Build macOS .icns icon
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        run: |
+          mkdir -p icon.iconset
 
-            - name: Rename executable
-              shell: bash
-              run: |
-                  VERSION=${GITHUB_REF_NAME}
-                  ARTIFACT_NAME="bugs-hunt-${VERSION}-${{ matrix.platform }}${{ matrix.ext }}"
-                  if [ -f dist/main.exe ]; then
-                    mv dist/main.exe "dist/${ARTIFACT_NAME}"
-                  else
-                    mv dist/main "dist/${ARTIFACT_NAME}"
-                  fi
-                  echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> $GITHUB_ENV
+          # Use PNG source (IMPORTANT: no .ico usage)
+          sips -z 16 16 icon.png --out icon.iconset/icon_16x16.png
+          sips -z 32 32 icon.png --out icon.iconset/icon_16x16@2x.png
+          sips -z 32 32 icon.png --out icon.iconset/icon_32x32.png
+          sips -z 64 64 icon.png --out icon.iconset/icon_32x32@2x.png
+          sips -z 128 128 icon.png --out icon.iconset/icon_128x128.png
+          sips -z 256 256 icon.png --out icon.iconset/icon_128x128@2x.png
+          sips -z 256 256 icon.png --out icon.iconset/icon_256x256.png
+          sips -z 512 512 icon.png --out icon.iconset/icon_256x256@2x.png
+          sips -z 512 512 icon.png --out icon.iconset/icon_512x512.png
 
-            - name: Upload to Release
-              uses: softprops/action-gh-release@v2
-              with:
-                  files: dist/${{ env.ARTIFACT_NAME }}
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          iconutil -c icns icon.iconset -o icon.icns
 
-    create-release:
-        needs: build
-        runs-on: ubuntu-latest
-        steps:
-            - name: Mark release as non-draft
-              run: echo "All builds done!"
+      # ---------------------------
+      # Set icon path per platform
+      # ---------------------------
+      - name: Set icon path
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then
+            echo "ICON_PATH=icon.icns" >> $GITHUB_ENV
+          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
+            echo "ICON_PATH=icon.ico" >> $GITHUB_ENV
+          else
+            echo "ICON_PATH=icon.png" >> $GITHUB_ENV
+          fi
+
+      # ---------------------------
+      # Build with PyInstaller
+      # ---------------------------
+      - name: Build executable
+        uses: sayyid5416/pyinstaller@v1
+        with:
+          python_ver: "3.12"
+          spec: "main.py"
+          requirements: "requirements.txt"
+          options: >-
+            --onefile
+            --noconsole
+            --icon "${{ env.ICON_PATH }}"
+            --add-data "bugs:bugs"
+            --add-data "audio:audio"
+            --add-data "assets:assets"
+            --add-data "oi-oi-oi/spritesheet.png:oi-oi-oi"
+            --add-data "background.png:."
+
+      # ---------------------------
+      # Rename output artifact
+      # ---------------------------
+      - name: Rename executable
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          ARTIFACT_NAME="bugs-hunt-${VERSION}-${{ matrix.platform }}${{ matrix.ext }}"
+
+          if [ -f dist/main.exe ]; then
+            mv dist/main.exe "dist/${ARTIFACT_NAME}"
+          else
+            mv dist/main "dist/${ARTIFACT_NAME}"
+          fi
+
+          echo "ARTIFACT_NAME=${ARTIFACT_NAME}" >> $GITHUB_ENV
+
+      # ---------------------------
+      # Upload release asset
+      # ---------------------------
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/${{ env.ARTIFACT_NAME }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create-release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Finalize release
+        run: echo "All builds completed successfully."
