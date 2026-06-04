@@ -30,29 +30,14 @@ jobs:
         uses: actions/checkout@v3
 
       # -----------------------------
-      # Install ImageMagick (Linux)
+      # Python deps for Windows ICO
       # -----------------------------
-      - name: Install ImageMagick (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: sudo apt-get update && sudo apt-get install -y imagemagick
-
-      # -----------------------------
-      # Generate Windows/Linux icons
-      # -----------------------------
-      - name: Generate Windows/Linux icons
+      - name: Install Pillow (Windows/Linux)
         if: matrix.os != 'macos-latest'
-        shell: bash
-        run: |
-          mkdir -p icons
-
-          # Windows ICO (multi-resolution)
-          magick icons/icon.png -define icon:auto-resize=256,128,64,48,32,16 icons/icon.ico
-
-          # Linux PNG (keep simple, optionally resize)
-          magick icons/icon.png -resize 512x512 icons/icon.png
+        run: pip install pillow
 
       # -----------------------------
-      # Generate macOS ICNS
+      # macOS ICNS (no external tools)
       # -----------------------------
       - name: Generate macOS icon (.icns)
         if: matrix.os == 'macos-latest'
@@ -74,7 +59,39 @@ jobs:
           iconutil -c icns icons/icon.iconset -o icons/icon.icns
 
       # -----------------------------
-      # Select correct icon per OS
+      # Windows ICO (Pillow, no magick)
+      # -----------------------------
+      - name: Generate Windows icon (.ico)
+        if: matrix.os == 'windows-latest'
+        shell: python
+        run: |
+          from PIL import Image
+
+          img = Image.open("icons/icon.png")
+          img.save(
+              "icons/icon.ico",
+              format="ICO",
+              sizes=[
+                  (16,16),
+                  (32,32),
+                  (48,48),
+                  (64,64),
+                  (128,128),
+                  (256,256)
+              ]
+          )
+
+      # -----------------------------
+      # Linux icon (simple PNG)
+      # -----------------------------
+      - name: Prepare Linux icon
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: |
+          cp icons/icon.png icons/icon.png
+
+      # -----------------------------
+      # Select icon per OS
       # -----------------------------
       - name: Set icon path
         shell: bash
@@ -88,7 +105,7 @@ jobs:
           fi
 
       # -----------------------------
-      # Build with PyInstaller
+      # Build
       # -----------------------------
       - name: Build executable
         uses: sayyid5416/pyinstaller@v1
@@ -132,12 +149,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # -----------------------------
-  # Final confirmation job
-  # -----------------------------
   create-release:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Mark release as complete
-        run: echo "All builds completed successfully!"
+      - name: Done
+        run: echo "Release complete"
