@@ -30,36 +30,14 @@ jobs:
         uses: actions/checkout@v3
 
       # -----------------------------
-      # Python deps for Windows ICO
+      # Windows only dependency
       # -----------------------------
-      - name: Install Pillow (Windows/Linux)
-        if: matrix.os != 'macos-latest'
+      - name: Install Pillow (Windows only)
+        if: matrix.os == 'windows-latest'
         run: pip install pillow
 
       # -----------------------------
-      # macOS ICNS (no external tools)
-      # -----------------------------
-      - name: Generate macOS icon (.icns)
-        if: matrix.os == 'macos-latest'
-        shell: bash
-        run: |
-          mkdir -p icons/icon.iconset
-
-          sips -z 16 16   icons/icon.png --out icons/icon.iconset/icon_16x16.png
-          sips -z 32 32   icons/icon.png --out icons/icon.iconset/icon_16x16@2x.png
-          sips -z 32 32   icons/icon.png --out icons/icon.iconset/icon_32x32.png
-          sips -z 64 64   icons/icon.png --out icons/icon.iconset/icon_32x32@2x.png
-          sips -z 128 128 icons/icon.png --out icons/icon.iconset/icon_128x128.png
-          sips -z 256 256 icons/icon.png --out icons/icon.iconset/icon_128x128@2x.png
-          sips -z 256 256 icons/icon.png --out icons/icon.iconset/icon_256x256.png
-          sips -z 512 512 icons/icon.png --out icons/icon.iconset/icon_256x256@2x.png
-          sips -z 512 512 icons/icon.png --out icons/icon.iconset/icon_512x512.png
-          sips -z 1024 1024 icons/icon.png --out icons/icon.iconset/icon_512x512@2x.png
-
-          iconutil -c icns icons/icon.iconset -o icons/icon.icns
-
-      # -----------------------------
-      # Windows ICO (Pillow, no magick)
+      # Windows ICO generation
       # -----------------------------
       - name: Generate Windows icon (.ico)
         if: matrix.os == 'windows-latest'
@@ -68,30 +46,37 @@ jobs:
           from PIL import Image
 
           img = Image.open("icons/icon.png")
+
           img.save(
               "icons/icon.ico",
               format="ICO",
-              sizes=[
-                  (16,16),
-                  (32,32),
-                  (48,48),
-                  (64,64),
-                  (128,128),
-                  (256,256)
-              ]
+              sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)]
           )
 
       # -----------------------------
-      # Linux icon (simple PNG)
+      # macOS ICNS (native tools)
       # -----------------------------
-      - name: Prepare Linux icon
-        if: matrix.os == 'ubuntu-latest'
+      - name: Generate macOS icon (.icns)
+        if: matrix.os == 'macos-latest'
         shell: bash
         run: |
-          cp icons/icon.png icons/icon.png
+          mkdir -p icons.iconset
+
+          sips -z 16 16   icons/icon.png --out icons.iconset/icon_16x16.png
+          sips -z 32 32   icons/icon.png --out icons.iconset/icon_16x16@2x.png
+          sips -z 32 32   icons/icon.png --out icons.iconset/icon_32x32.png
+          sips -z 64 64   icons/icon.png --out icons.iconset/icon_32x32@2x.png
+          sips -z 128 128 icons/icon.png --out icons.iconset/icon_128x128.png
+          sips -z 256 256 icons/icon.png --out icons.iconset/icon_128x128@2x.png
+          sips -z 256 256 icons/icon.png --out icons.iconset/icon_256x256.png
+          sips -z 512 512 icons/icon.png --out icons.iconset/icon_256x256@2x.png
+          sips -z 512 512 icons/icon.png --out icons.iconset/icon_512x512.png
+          sips -z 1024 1024 icons/icon.png --out icons.iconset/icon_512x512@2x.png
+
+          iconutil -c icns icons.iconset -o icons/icon.icns
 
       # -----------------------------
-      # Select icon per OS
+      # Set icon per OS
       # -----------------------------
       - name: Set icon path
         shell: bash
@@ -105,7 +90,7 @@ jobs:
           fi
 
       # -----------------------------
-      # Build
+      # Build executable
       # -----------------------------
       - name: Build executable
         uses: sayyid5416/pyinstaller@v1
@@ -123,7 +108,7 @@ jobs:
             --add-data "background.png:."
 
       # -----------------------------
-      # Rename artifacts
+      # Rename artifact
       # -----------------------------
       - name: Rename executable
         shell: bash
@@ -154,4 +139,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Done
-        run: echo "Release complete"
+        run: echo "Build completed"
