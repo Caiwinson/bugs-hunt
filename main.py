@@ -261,13 +261,59 @@ pygame.font.init()
 font = pygame.font.Font(None, 36)  # You can specify the font file and size
 
 # Set up the display, borderless window
-screen = pygame.display.set_mode((800, 600))
+screen = pygame.display.set_mode(
+    (800, 600), pygame.SCALED | pygame.DOUBLEBUF, vsync=1)
+window_mode = 0  # 0: windowed, 1: borderless fullscreen, 2: true fullscreen
 pygame.display.set_caption("Bugs Hunt")
 pygame.mouse.set_visible(False)
 
 preload()
 
-max_fps = 60
+# Build keybind overlay surface
+small_font = pygame.font.Font(None, 26)
+_keybind_surface = pygame.Surface((800, 600), pygame.SRCALPHA)
+
+keyboard_binds = [
+    ("G",   "Start the game"),
+    ("Esc", "Quit the game"),
+    ("F",   "Flashbang"),
+    ("P",   "Flashbang (no sound)"),
+    ("H",   "Reset score"),
+    ("M",   "Toggle display mode"),
+    ("N",   "Set timer to 00:00"),
+    ("F11", "Toggle fullscreen"),
+]
+mouse_binds = [
+    ("Left Click",   "Fire"),
+    ("Right Click",  "Reload"),
+    ("Scroll Up",    "Switch to pistol"),
+    ("Scroll Down",  "Switch to shotgun"),
+]
+
+_line_h = 28
+
+
+def _render_binds(surface, binds, x, align_right=False):
+    y = 180
+    for key, action in binds:
+        key_surf = small_font.render(key,           True, (255, 220, 80,  255))
+        action_surf = small_font.render(
+            f"  {action}", True, (220, 220, 220, 255))
+        if align_right:
+            total_w = key_surf.get_width() + action_surf.get_width()
+            surface.blit(key_surf,    (x - total_w, y))
+            surface.blit(action_surf, (x - total_w + key_surf.get_width(), y))
+        else:
+            surface.blit(key_surf,    (x, y))
+            surface.blit(action_surf, (x + key_surf.get_width(), y))
+        y += _line_h
+
+
+_render_binds(_keybind_surface, mouse_binds,    14,        align_right=False)
+_render_binds(_keybind_surface, keyboard_binds, 800 - 14,  align_right=True)
+
+KEYBIND_SOLID = 3000   # ms fully visible
+KEYBIND_FADE = 2000   # ms to fade out
 
 # Load background image
 background = pygame.image.load(resource_path('background.png')).convert()
@@ -290,6 +336,7 @@ clock = pygame.time.Clock()
 last_spawn_time = 0
 
 t = -300000
+keybind_start = pygame.time.get_ticks()
 
 
 def spawn_bug():
@@ -454,6 +501,23 @@ while running:
                 display_mode = not display_mode
             if event.key == pygame.K_n:
                 t = pygame.time.get_ticks()-300000
+            if event.key == pygame.K_F11:
+                window_mode = (window_mode + 1) % 3
+                if window_mode == 0:
+                    # Windowed
+                    screen = pygame.display.set_mode(
+                        (800, 600), pygame.SCALED | pygame.DOUBLEBUF, vsync=1)
+                elif window_mode == 1:
+                    # Borderless fullscreen (4:3 scaled to desktop)
+                    info = pygame.display.Info()
+                    h = info.current_h
+                    w = (h * 4) // 3
+                    screen = pygame.display.set_mode(
+                        (w, h), pygame.SCALED | pygame.DOUBLEBUF | pygame.NOFRAME, vsync=1)
+                elif window_mode == 2:
+                    # True fullscreen
+                    screen = pygame.display.set_mode(
+                        (800, 600), pygame.SCALED | pygame.DOUBLEBUF | pygame.FULLSCREEN, vsync=1)
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1 and not reloading and (pygame.time.get_ticks() - last_fire_time) >= rate_of_fire:
@@ -605,7 +669,18 @@ while running:
 
     screen.blit(assets[f"{hit_type}{bullet_count}"], (10, 305))
 
+    # Keybind overlay
+    keybind_elapsed = pygame.time.get_ticks() - keybind_start
+    if keybind_elapsed < KEYBIND_SOLID + KEYBIND_FADE:
+        if keybind_elapsed < KEYBIND_SOLID:
+            alpha = 255
+        else:
+            alpha = int(
+                255 * (1 - (keybind_elapsed - KEYBIND_SOLID) / KEYBIND_FADE))
+        _keybind_surface.set_alpha(alpha)
+        screen.blit(_keybind_surface, (0, 0))
+
     pygame.display.flip()
-    clock.tick(max_fps)
+    clock.tick()
 
 pygame.quit()
